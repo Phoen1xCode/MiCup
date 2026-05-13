@@ -225,3 +225,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MiCup
+cyberdog_sim/
+cyberdog_ws/
+eigen-git-mirror/
+lcm/
