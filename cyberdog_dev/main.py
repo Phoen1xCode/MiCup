@@ -85,12 +85,14 @@ def main(argv=None) -> int:
     from stages.stage1_stone_path import Stage1StonePath
     from stages.stage2_orange_balls import Stage2OrangeBalls
     from stages.stage3_curve_dash import Stage3CurveDash
+    from stages.stage5_bridge import Stage5Bridge
     from stages.stage6_kick import Stage6Kick
 
     STAGE_REGISTRY = {
         1: Stage1StonePath,
         2: Stage2OrangeBalls,
         3: Stage3CurveDash,
+        5: Stage5Bridge,
         6: Stage6Kick,
     }
 
