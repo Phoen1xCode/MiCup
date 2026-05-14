@@ -1,0 +1,23 @@
+# 各赛段速度/距离阈值/超时。本计划只填 Stage 1，后续计划补充 2-6。
+# 所有数值为 Gazebo 保守初值，进仿真后逐段调参。
+
+[stage1]
+stand_time = 4.5
+stabilize_time = 1.2
+forward_speed = 0.2
+exit_speed = 0.3
+turn_forward_speed = 0.3
+turn_yaw_speed = 0.52
+turn_angle = 1.57
+bend_front_threshold = 1.05
+open_side_threshold = 1.15
+exit_front_clear = 1.65
+min_straight_time = 6.0
+max_straight_time = 16.0
+min_turn_time = 2.0
+max_turn_time = 5.5
+finish_straight_time = 4.5
+max_time = 45.0
+lateral_gain = 0.12
+max_lateral = 0.08
+front_stop_distance = 0.45

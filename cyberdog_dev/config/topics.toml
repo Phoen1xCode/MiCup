@@ -1,0 +1,16 @@
+# sim/real 两套 topic 名与 LCM 命名空间。
+# demo1 里散落的 /mi_desktop_48_b0_2d_5f_ba_36 命名空间集中到这里。
+
+[sim]
+namespace = ""
+scan_topic = "/scan"
+odom_topic = "/odom_out"
+camera_topic = "/rgb_camera/image_raw"
+imu_topic = "/imu"
+
+[real]
+namespace = "/mi_desktop_48_b0_2d_5f_ba_36"
+scan_topic = "/mi_desktop_48_b0_2d_5f_ba_36/scan"
+odom_topic = "/mi_desktop_48_b0_2d_5f_ba_36/odom_out"
+camera_topic = "/mi_desktop_48_b0_2d_5f_ba_36/image"
+imu_topic = "/camera/imu"
