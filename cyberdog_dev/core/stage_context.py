@@ -31,6 +31,7 @@ def build_context(mode: RunMode) -> StageContext:
 
     from core.pose_monitor import RobotPoseMonitor
     from core.robot_ctrl import RobotCtrl, ConsoleLogger
+    from core.voice import VoiceController
     from perception.hub import PerceptionHub
 
     if not rclpy.ok():
@@ -50,7 +51,7 @@ def build_context(mode: RunMode) -> StageContext:
         dog=dog,
         pose=pose,
         perception=perception,
-        voice=None,
+        voice=VoiceController(logger=logger),
         logger=logger,
         mode=mode,
     )
