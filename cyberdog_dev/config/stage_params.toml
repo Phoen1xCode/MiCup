@@ -4,9 +4,9 @@
 [stage1]
 stand_time = 4.5
 stabilize_time = 1.2
-forward_speed = 0.2
+forward_speed = 0.28
 exit_speed = 0.3
-turn_forward_speed = 0.3
+turn_forward_speed = 0.16
 turn_yaw_speed = 0.52
 turn_angle = 1.57
 bend_front_threshold = 1.05

@@ -537,7 +537,7 @@ class RobotCtrl:
 
     def set_velocity(self, vx: float, vy: float, wz: float, *,
                      body_height: float = 0.28,
-                     step_height: tuple = (0.05, 0.05)) -> None:
+                     step_height: tuple = (0.11, 0.11)) -> None:
         self.set_velocity_command(vx, vy, wz, body_height=body_height,
                                   step_height=step_height)
 
