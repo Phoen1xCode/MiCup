@@ -21,3 +21,71 @@ max_time = 45.0
 lateral_gain = 0.12
 max_lateral = 0.08
 front_stop_distance = 0.45
+
+[stage2]
+search_turn_speed = 0.35
+approach_speed = 0.18
+approach_turn_gain = 1.2
+bump_speed = 0.45
+bump_time = 0.8
+backoff_speed = -0.18
+backoff_time = 1.0
+hit_distance = 0.32
+target_count = 4
+exit_speed = 0.28
+exit_time = 4.0
+max_time = 150.0
+
+[stage3]
+forward_speed = 0.32
+lateral_gain = 0.12
+max_lateral = 0.08
+front_stop_distance = 0.45
+exit_front_clear = 1.8
+open_side_threshold = 1.2
+min_follow_time = 8.0
+max_follow_time = 24.0
+exit_speed = 0.32
+exit_time = 4.0
+max_time = 60.0
+
+[stage4]
+lane_count = 3
+lane_scan_time = 5.0
+lane_shift_time = 2.0
+lane_shift_speed = 0.18
+approach_speed = 0.18
+bump_speed = 0.4
+bump_time = 0.9
+kick_speed = 0.5
+kick_time = 1.2
+detour_speed = 0.18
+detour_time = 3.0
+low_walk_speed = 0.12
+low_walk_time = 3.0
+bridge_speed = 0.2
+bridge_time = 4.0
+announce_wait = 1.0
+max_time = 240.0
+
+[stage5]
+bridge_speed = 0.12
+lateral_gain = 0.08
+max_lateral = 0.04
+front_stop_distance = 0.25
+min_walk_time = 8.0
+max_walk_time = 24.0
+jump_speed = 0.45
+jump_time = 0.9
+max_time = 70.0
+
+[stage6]
+search_turn_speed = 0.3
+align_turn_gain = 1.0
+approach_speed = 0.18
+kick_speed = 0.55
+kick_time = 1.5
+finish_speed = 0.25
+finish_time = 4.0
+lie_down_time = 1.0
+max_time = 60.0

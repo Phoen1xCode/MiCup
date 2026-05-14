@@ -1,0 +1,59 @@
+[sim.orange_ball]
+lower = [5, 80, 80]
+upper = [25, 255, 255]
+
+[real.orange_ball]
+lower = [5, 70, 70]
+upper = [28, 255, 255]
+
+[sim.yellow_lane]
+lower = [22, 80, 80]
+upper = [38, 255, 255]
+
+[real.yellow_lane]
+lower = [20, 70, 70]
+upper = [40, 255, 255]
+
+[sim.red_pole]
+lower1 = [0, 100, 80]
+upper1 = [10, 255, 255]
+lower2 = [170, 100, 80]
+upper2 = [180, 255, 255]
+
+[real.red_pole]
+lower1 = [0, 90, 70]
+upper1 = [12, 255, 255]
+lower2 = [168, 90, 70]
+upper2 = [180, 255, 255]
+
+[sim.white_dashed]
+lower = [0, 0, 190]
+upper = [180, 60, 255]
+
+[real.white_dashed]
+lower = [0, 0, 170]
+upper = [180, 80, 255]
+
+[sim.gray_block]
+lower = [0, 0, 45]
+upper = [180, 60, 170]
+
+[real.gray_block]
+lower = [0, 0, 35]
+upper = [180, 80, 180]
+
+[sim.coke]
+lower = [0, 70, 45]
+upper = [15, 255, 210]
+
+[real.coke]
+lower = [0, 60, 35]
+upper = [18, 255, 220]
+
+[sim.football_dark]
+lower = [0, 0, 0]
+upper = [180, 80, 80]
+
+[real.football_dark]
+lower = [0, 0, 0]
+upper = [180, 90, 90]
