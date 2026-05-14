@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""MiCup 2026 CyberDog 比赛入口。
+"""2026 MiCup CyberDog 比赛入口。
 
 用法：
     python3 main.py --mode sim --stages 1
     python3 main.py --mode sim --stages 1-6
+    python3 main.py --mode sim --stages all
     python3 main.py --mode real --stages 1,3,5
 
 需在 ROS2 环境（Gazebo 容器 / 实机）中运行。感知节点与 odom 广播
@@ -24,8 +25,8 @@ def parse_stages(value: str):
         if not part:
             continue
         if "-" in part:
-            lo, hi = part.split("-")
-            result.extend(range(int(lo), int(hi) + 1))
+            left, right = part.split("-")
+            result.extend(range(int(left), int(right) + 1))
         else:
             result.append(int(part))
     for n in result:
@@ -35,17 +36,24 @@ def parse_stages(value: str):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="MiCup 2026 CyberDog competition runner")
-    parser.add_argument("--mode", default="sim", choices=["sim", "real"],
-                        help="运行模式：sim=Gazebo 仿真，real=实机")
-    parser.add_argument("--stages", default="1-6", type=parse_stages,
-                        help="要跑的赛段，如 1-6 或 1,3,5")
+    parser = argparse.ArgumentParser(
+        description="2026 MiCup CyberDog competition runner"
+    )
+    parser.add_argument(
+        "--mode",
+        default="sim",
+        choices=["sim", "real"],
+        help="sim = Gazebo 仿真，real = 实机",
+    )
+    parser.add_argument(
+        "--stages", default="1-6", type=parse_stages, help="要跑的赛段，如 1-6 或 1,3,5"
+    )
     return parser
 
 
 def run_stage(stage, ctx) -> "StageResult":
     """以 ~20Hz tick 一个赛段直到结束或超时。"""
-    from core.stage_base import StageStatus, StageResult
+    from core.stage_base import StageResult, StageStatus
 
     stage.on_enter()
     start = time.monotonic()
@@ -61,8 +69,13 @@ def run_stage(stage, ctx) -> "StageResult":
     finally:
         stage.on_exit()
     elapsed = time.monotonic() - start
-    return StageResult(stage_id=stage.stage_id, name=stage.name,
-                       status=status, notes=list(stage.notes), elapsed_sec=elapsed)
+    return StageResult(
+        stage_id=stage.stage_id,
+        name=stage.name,
+        status=status,
+        notes=list(stage.notes),
+        elapsed_sec=elapsed,
+    )
 
 
 def main(argv=None) -> int:
@@ -70,9 +83,11 @@ def main(argv=None) -> int:
 
     from core.stage_context import RunMode, build_context
     from stages.stage1_stone_path import Stage1StonePath
+    from stages.stage3_curve_dash import Stage3CurveDash
 
     STAGE_REGISTRY = {
         1: Stage1StonePath,
+        3: Stage3CurveDash,
     }
 
     ctx = build_context(RunMode(args.mode))
