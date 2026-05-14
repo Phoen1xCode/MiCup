@@ -1,5 +1,7 @@
 """Stage 4 · 深隧寻珍."""
 
+from __future__ import annotations
+
 import time
 from enum import Enum, auto
 from pathlib import Path

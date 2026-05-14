@@ -1,5 +1,7 @@
 """Minimal voice controller for required Stage 4 announcements."""
 
+from __future__ import annotations
+
 
 class VoiceController:
     def __init__(self, logger=None):

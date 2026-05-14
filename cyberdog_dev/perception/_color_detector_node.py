@@ -1,5 +1,7 @@
 """Shared lightweight ROS2 camera detector runtime."""
 
+from __future__ import annotations
+
 import argparse
 import json
 from pathlib import Path

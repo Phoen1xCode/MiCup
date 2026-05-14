@@ -1,5 +1,7 @@
 """Pure vision helpers shared by lightweight detector nodes."""
 
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence

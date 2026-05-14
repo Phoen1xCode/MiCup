@@ -1,5 +1,7 @@
 """PerceptionHub -- Stage 获取检测结果的唯一入口（spec 3.5）。"""
 
+from __future__ import annotations
+
 import json
 import threading
 from dataclasses import dataclass
