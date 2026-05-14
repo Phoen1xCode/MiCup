@@ -15,8 +15,19 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
-echo "[1/3] 启动激光雷达走廊检测节点..."
-python3 -m perception.lidar --mode "$MODE" &
+echo "[1/3] 启动感知节点..."
+for node in \
+    perception.lidar \
+    perception.orange_ball \
+    perception.football \
+    perception.red_pole \
+    perception.block_obstacle \
+    perception.lane_edge \
+    perception.dashed_line \
+    perception.coke
+do
+    python3 -m "$node" --mode "$MODE" &
+done
 
 echo "[2/3] 启动 odom -> TF 广播..."
 python3 -m core.odom_broadcaster --mode "$MODE" &
