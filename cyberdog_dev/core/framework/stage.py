@@ -1,4 +1,4 @@
-"""Stage 基类与状态类型（spec 3.1）。"""
+"""Stage 基类与状态类型 赛段抽象"""
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -6,9 +6,9 @@ from typing import List
 
 
 class StageStatus(Enum):
-    RUNNING = auto()
-    SUCCEEDED = auto()
-    FAILED = auto()
+    RUNNING = auto()  # 正在执行
+    SUCCEEDED = auto()  # 成功完成
+    FAILED = auto()  # 失败
     NEED_HELP = auto()
 
 

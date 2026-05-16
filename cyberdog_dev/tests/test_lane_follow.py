@@ -1,4 +1,4 @@
-from core._lane_follow import compute_lane_follow_correction, LaneFollowParams
+from core.lane_follow import compute_lane_follow_correction, LaneFollowParams
 
 
 PARAMS = LaneFollowParams(

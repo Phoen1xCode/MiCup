@@ -45,6 +45,11 @@ def test_lane_and_dashed_defaults():
     lane = LaneEdges()
     assert lane.left_offset_px == 0.0
     assert lane.right_offset_px == 0.0
+    assert lane.center_offset_px == 0.0
+    assert lane.left_confidence == 0.0
+    assert lane.right_confidence == 0.0
+    assert lane.horizontal_confidence == 0.0
+    assert lane.turn_hint == ""
     assert lane.confidence == 0.0
 
     dashed = DashedLineDet(center_px=(50.0, 80.0), confidence=0.7)

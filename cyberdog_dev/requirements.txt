@@ -2,3 +2,4 @@ numpy
 opencv-python
 toml
 lcm
+pytest>=7.0

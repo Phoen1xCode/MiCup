@@ -1,4 +1,4 @@
-from core.stage_context import RunMode, StageContext
+from core.framework.context import RunMode, StageContext
 
 
 def test_runmode_has_sim_and_real():

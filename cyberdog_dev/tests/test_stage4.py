@@ -1,12 +1,11 @@
-from core.stage_base import StageStatus
+from core.framework.stage import StageStatus
 from perception.hub import BallDet, ObjDet, PoleDet
 from stages.stage4_tunnel_search import Phase, Stage4TunnelSearch
 
 
 class FakeDog:
     def __init__(self): self.calls = []
-    def set_velocity(self, vx, vy, wz, **kwargs): self.calls.append(("vel", vx, vy, wz, kwargs))
-    def stop(self): self.calls.append(("stop",))
+    def set_velocity_command(self, vx, vy, wz, **kw): self.calls.append(("vel", vx, vy, wz, kw))
 
 
 class FakePose:
@@ -98,6 +97,26 @@ def test_stage4_limit_pole_uses_low_walk(monkeypatch):
     stage.tick()
     assert calls == [(ctx.dog, stage.p["low_walk_time"], stage.p["low_walk_speed"])]
     assert "red_pole" in stage.handled_obstacles
+
+
+def test_stage4_far_target_is_approached_before_interaction():
+    stage, ctx = make_stage(FakePerception(cokes=[obj("coke", distance=1.2)]))
+    stage.phase = Phase.SCAN_LANE
+    stage.tick()
+    assert ctx.voice.history == ["识别到可乐瓶"]
+    assert stage.phase is Phase.APPROACH_ITEM
+
+    stage.tick()
+    assert stage.phase is Phase.APPROACH_ITEM
+    assert ctx.dog.calls[-1][0] == "vel"
+    assert ctx.dog.calls[-1][1] == stage.p["approach_speed"]
+
+
+def test_stage4_close_target_enters_interaction():
+    stage, _ = make_stage(FakePerception(cokes=[obj("coke", distance=0.35)]))
+    stage.phase = Phase.SCAN_LANE
+    stage.tick()
+    assert stage.phase is Phase.INTERACT
 
 
 def test_stage4_lane_shift_advances_scan_lane():

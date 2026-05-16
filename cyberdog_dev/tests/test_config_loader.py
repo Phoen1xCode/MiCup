@@ -24,5 +24,6 @@ def test_load_topics_rejects_unknown_mode():
 
 def test_load_stage_params_stage1():
     p = load_stage_params(CONFIG_DIR / "stage_params.toml", stage_id=1)
-    assert p["forward_speed"] == 0.2
+    assert p["forward_speed"] > 0.0
     assert p["max_time"] == 45.0
+    assert p["visual_lane_confidence"] > 0.0

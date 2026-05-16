@@ -1,13 +1,12 @@
-from core.stage_base import StageStatus
+from core.framework.stage import StageStatus
 from perception.hub import BallDet
 from stages.stage6_kick import Phase, Stage6Kick
 
 
 class FakeDog:
     def __init__(self): self.calls = []
-    def set_velocity(self, vx, vy, wz): self.calls.append(("vel", vx, vy, wz))
-    def stop(self): self.calls.append(("stop",))
-    def lie_down(self, *, hold=0.0): self.calls.append(("lie_down", hold)); return True
+    def set_velocity_command(self, vx, vy, wz, **kw): self.calls.append(("vel", vx, vy, wz))
+    def execute_discrete_action(self, **kwargs): self.calls.append(("execute_discrete_action", kwargs)); return True
 
 
 class FakePose:
@@ -52,6 +51,23 @@ def test_stage6_aligns_to_visible_ball():
     assert ctx.dog.calls[-1][0] == "vel"
 
 
+def test_stage6_aligned_far_ball_keeps_approaching():
+    ball = BallDet((0, 0, 20, 20), (10.0, 10.0), 400.0, 0.02, 0.9, 0.9)
+    stage, ctx = make_stage(ball)
+    stage.phase = Phase.ALIGN_BEHIND_BALL
+    stage.tick()
+    assert stage.phase is Phase.ALIGN_BEHIND_BALL
+    assert ctx.dog.calls[-1] == ("vel", stage.p["approach_speed"], 0.0, 0.0)
+
+
+def test_stage6_aligned_close_ball_enters_kick():
+    ball = BallDet((0, 0, 20, 20), (10.0, 10.0), 400.0, 0.02, 0.28, 0.9)
+    stage, _ = make_stage(ball)
+    stage.phase = Phase.ALIGN_BEHIND_BALL
+    stage.tick()
+    assert stage.phase is Phase.KICK
+
+
 def test_stage6_lie_down_reaches_done():
     stage, ctx = make_stage()
     stage.phase = Phase.LIE_DOWN_IN_CIRCLE
@@ -59,4 +75,4 @@ def test_stage6_lie_down_reaches_done():
     status = stage.tick()
     assert status is StageStatus.RUNNING
     assert stage.phase is Phase.DONE
-    assert ctx.dog.calls[-1][0] == "lie_down"
+    assert ctx.dog.calls[-1][0] == "execute_discrete_action"

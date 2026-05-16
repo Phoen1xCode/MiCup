@@ -4,7 +4,7 @@
 发布到 /perception/lidar_corridor（geometry_msgs/Vector3，
 x=left, y=front, z=right；无返回用一个大值 99.9 表示）。
 
-独立运行：python3 -m perception.lidar --mode sim
+独立运行：python3 -m perception.lidar_corridor --mode sim
 """
 
 import argparse

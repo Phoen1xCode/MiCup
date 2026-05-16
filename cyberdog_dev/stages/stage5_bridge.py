@@ -4,13 +4,14 @@ import time
 from enum import Enum, auto
 from pathlib import Path
 
-from core.stage_base import Stage, StageStatus
+from core.framework.stage import Stage, StageStatus
 from config.loader import load_stage_params
 
 
 class Phase(Enum):
     ENTER = auto()
     WALK_BRIDGE = auto()
+    CLEAR_DASHED_LINE = auto()
     JUMP_DOWN = auto()
     DONE = auto()
 
@@ -63,20 +64,28 @@ class Stage5Bridge(Stage):
             return StageStatus.RUNNING
 
         if self.phase == Phase.WALK_BRIDGE:
-            self.ctx.dog.set_velocity(
+            self.ctx.dog.set_velocity_command(
                 self.p["bridge_speed"], self._bridge_lateral_speed(), 0.0)
-            if self._dashed_line_ready(elapsed) or elapsed >= self.p["max_walk_time"]:
+            if self._dashed_line_ready(elapsed):
+                self._switch(Phase.CLEAR_DASHED_LINE)
+            elif elapsed >= self.p["max_walk_time"]:
+                self._switch(Phase.JUMP_DOWN)
+            return StageStatus.RUNNING
+
+        if self.phase == Phase.CLEAR_DASHED_LINE:
+            self.ctx.dog.set_velocity_command(self.p["bridge_speed"], 0.0, 0.0)
+            if elapsed >= self.p["clear_dashed_time"]:
                 self._switch(Phase.JUMP_DOWN)
             return StageStatus.RUNNING
 
         if self.phase == Phase.JUMP_DOWN:
-            self.ctx.dog.set_velocity(self.p["jump_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["jump_speed"], 0.0, 0.0)
             if elapsed >= self.p["jump_time"]:
                 self._switch(Phase.DONE)
             return StageStatus.RUNNING
 
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
         return StageStatus.SUCCEEDED
 
     def on_exit(self) -> None:
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)

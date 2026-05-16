@@ -1,5 +1,5 @@
-from core.gaits.low_walk import execute_low_walk
-from core.voice import VoiceController
+from core.customized_gait.low_walk import execute_low_walk
+from core.framework.voice import VoiceController
 
 
 class FakeLogger:
@@ -10,8 +10,7 @@ class FakeLogger:
 
 class FakeDog:
     def __init__(self): self.calls = []
-    def set_velocity(self, vx, vy, wz, **kwargs): self.calls.append((vx, vy, wz, kwargs))
-    def stop(self): self.calls.append(("stop",))
+    def set_velocity_command(self, vx, vy, wz, **kwargs): self.calls.append((vx, vy, wz, kwargs))
 
 
 def test_voice_controller_records_spoken_text():
@@ -26,4 +25,4 @@ def test_low_walk_sets_velocity_and_stops():
     dog = FakeDog()
     assert execute_low_walk(dog, duration_sec=0.0, speed=0.12)
     assert dog.calls[0][0:3] == (0.12, 0.0, 0.0)
-    assert dog.calls[-1] == ("stop",)
+    assert dog.calls[-1] == (0.0, 0.0, 0.0, {})

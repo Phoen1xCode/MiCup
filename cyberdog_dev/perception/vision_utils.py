@@ -77,3 +77,134 @@ def detect_colored_objects_hsv(image_hsv: Sequence[Sequence[Sequence[int]]],
         return []
     image_width = len(image_hsv[0]) if image_hsv and image_hsv[0] else 0
     return [det_from_bbox(label, bbox, image_width=image_width, real_width_m=real_width_m, confidence=0.6)]
+
+
+def _shape(image_hsv: Sequence[Sequence[Sequence[int]]]) -> tuple[int, int]:
+    height = len(image_hsv)
+    width = len(image_hsv[0]) if height and image_hsv[0] is not None else 0
+    return height, width
+
+
+def _mask_points(image_hsv: Sequence[Sequence[Sequence[int]]],
+                 hsv_ranges: Iterable[HsvRange],
+                 *,
+                 y_min_ratio: float = 0.0) -> list[tuple[int, int]]:
+    ranges = list(hsv_ranges)
+    height, width = _shape(image_hsv)
+    y_min = int(height * y_min_ratio)
+    points: list[tuple[int, int]] = []
+    for y, row in enumerate(image_hsv):
+        if y < y_min:
+            continue
+        for x, pixel in enumerate(row):
+            if any(in_hsv_range(pixel, r) for r in ranges):
+                points.append((x, y))
+    return points
+
+
+def detect_lane_edges_hsv(image_hsv: Sequence[Sequence[Sequence[int]]],
+                          hsv_ranges: Iterable[HsvRange]) -> dict:
+    """检测赛道黄边线，返回 PerceptionHub.LaneEdges 可解析的 dict。
+
+    算法故意保持简单：只看图像下半部分的黄色像素，按左右半区估计边线
+    中心，并用近场横向黄线作为转弯提示。Gazebo 调参时主要调 HSV 与
+    Stage 阈值，不在这里引入复杂拟合。
+    """
+    height, width = _shape(image_hsv)
+    if width <= 0 or height <= 0:
+        return {
+            "left_offset_px": 0.0,
+            "right_offset_px": 0.0,
+            "center_offset_px": 0.0,
+            "left_confidence": 0.0,
+            "right_confidence": 0.0,
+            "horizontal_confidence": 0.0,
+            "turn_hint": "",
+            "confidence": 0.0,
+        }
+
+    points = _mask_points(image_hsv, hsv_ranges, y_min_ratio=0.45)
+    center_x = width / 2.0
+    left_xs = [x for x, _ in points if x < center_x]
+    right_xs = [x for x, _ in points if x >= center_x]
+    min_side_pixels = max(8, int(height * width * 0.002))
+
+    left_conf = min(1.0, len(left_xs) / float(min_side_pixels))
+    right_conf = min(1.0, len(right_xs) / float(min_side_pixels))
+
+    left_offset = 0.0
+    right_offset = 0.0
+    if left_xs:
+        left_offset = (sum(left_xs) / len(left_xs)) - center_x
+    if right_xs:
+        right_offset = (sum(right_xs) / len(right_xs)) - center_x
+
+    if left_xs and right_xs:
+        lane_center = ((sum(left_xs) / len(left_xs)) + (sum(right_xs) / len(right_xs))) / 2.0
+        confidence = min(left_conf, right_conf)
+    elif left_xs:
+        # 单边线兜底：赛道宽度未知时保持半幅画面余量，避免压线。
+        lane_center = (sum(left_xs) / len(left_xs)) + width * 0.32
+        confidence = left_conf * 0.6
+    elif right_xs:
+        lane_center = (sum(right_xs) / len(right_xs)) - width * 0.32
+        confidence = right_conf * 0.6
+    else:
+        lane_center = center_x
+        confidence = 0.0
+
+    bottom_y = int(height * 0.72)
+    near_points = [(x, y) for x, y in points if y >= bottom_y]
+    row_counts: dict[int, int] = {}
+    for _, y in near_points:
+        row_counts[y] = row_counts.get(y, 0) + 1
+    horizontal_pixels = max(row_counts.values()) if row_counts else 0
+    horizontal_conf = min(1.0, horizontal_pixels / max(1.0, width * 0.45))
+
+    turn_hint = ""
+    if horizontal_conf >= 0.5:
+        left_near = sum(1 for x, _ in near_points if x < center_x)
+        right_near = len(near_points) - left_near
+        if left_near > right_near * 1.2:
+            turn_hint = "left"
+        elif right_near > left_near * 1.2:
+            turn_hint = "right"
+
+    return {
+        "left_offset_px": float(left_offset),
+        "right_offset_px": float(right_offset),
+        "center_offset_px": float(lane_center - center_x),
+        "left_confidence": float(left_conf),
+        "right_confidence": float(right_conf),
+        "horizontal_confidence": float(horizontal_conf),
+        "turn_hint": turn_hint,
+        "confidence": float(confidence),
+    }
+
+
+def detect_dashed_line_hsv(image_hsv: Sequence[Sequence[Sequence[int]]],
+                           hsv_ranges: Iterable[HsvRange]) -> Optional[dict]:
+    """检测近场白色虚线/横线，返回 DashedLineDet 可解析的 dict。"""
+    height, width = _shape(image_hsv)
+    if width <= 0 or height <= 0:
+        return None
+
+    points = _mask_points(image_hsv, hsv_ranges, y_min_ratio=0.45)
+    if not points:
+        return None
+
+    min_pixels = max(6, int(width * 0.12))
+    if len(points) < min_pixels:
+        return None
+
+    xs = [x for x, _ in points]
+    ys = [y for _, y in points]
+    bbox_w = max(xs) - min(xs) + 1
+    bbox_h = max(ys) - min(ys) + 1
+    if bbox_w < width * 0.15 or bbox_w < bbox_h * 2.0:
+        return None
+
+    return {
+        "center_px": [float(sum(xs) / len(xs)), float(sum(ys) / len(ys))],
+        "confidence": min(1.0, len(points) / float(max(1, width * 4))),
+    }

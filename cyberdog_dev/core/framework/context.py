@@ -1,4 +1,4 @@
-"""StageContext 依赖容器、RunMode、build_context 工厂（spec 3.2/3.6）。"""
+"""StageContext 依赖容器、RunMode、build_context 工厂"""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -13,6 +13,7 @@ class RunMode(Enum):
 @dataclass
 class StageContext:
     """Stage 运行时的依赖容器。Stage 只通过 ctx.xxx 拿能力。"""
+
     dog: Any
     pose: Any
     perception: Any
@@ -27,18 +28,18 @@ def build_context(mode: RunMode) -> StageContext:
     依赖 rclpy/lcm，只能在 ROS2 环境（Gazebo 容器/实机）中调用。
     """
     import rclpy
+    from perception.hub import PerceptionHub
     from rclpy.node import Node
 
-    from core.pose_monitor import RobotPoseMonitor
-    from core.robot_ctrl import RobotCtrl, ConsoleLogger
-    from core.voice import VoiceController
-    from perception.hub import PerceptionHub
+    from core.framework.voice import VoiceController
+    from core.localization.pose_monitor import RobotPoseMonitor
+    from core.robot_ctrl import ConsoleLogger, RobotCtrl
 
     if not rclpy.ok():
         rclpy.init(args=None)
 
     logger = ConsoleLogger()
-    dog = RobotCtrl(ros2_logger=logger, enable_odom_lcm=False, cmd_heartbeat_hz=20.0)
+    dog = RobotCtrl(logger=logger, enable_odom_lcm=True, cmd_heartbeat_hz=20.0)
     dog.start()
 
     pose = RobotPoseMonitor()

@@ -57,6 +57,11 @@ class CorridorState:
 class LaneEdges:
     left_offset_px: float = 0.0
     right_offset_px: float = 0.0
+    center_offset_px: float = 0.0
+    left_confidence: float = 0.0
+    right_confidence: float = 0.0
+    horizontal_confidence: float = 0.0
+    turn_hint: str = ""
     confidence: float = 0.0
 
 
@@ -64,6 +69,17 @@ class LaneEdges:
 class DashedLineDet:
     center_px: tuple[float, float]
     confidence: float
+
+
+@dataclass
+class SlopeState:
+    """LiDAR 坡道检测结果。"""
+    detected: bool = False
+    angle_deg: float = 0.0
+    distance_m: float = NO_RETURN
+    midpoint_m: float = NO_RETURN
+    length_m: float = 0.0
+    status: str = ""
 
 
 class PerceptionHub:
@@ -79,6 +95,7 @@ class PerceptionHub:
         self._block_obstacles: list[ObjDet] = []
         self._lane_edges = LaneEdges()
         self._dashed_line: Optional[DashedLineDet] = None
+        self._slope = SlopeState()
         self._node = None
 
     def attach_node(self, node):
@@ -103,6 +120,8 @@ class PerceptionHub:
             String, "/perception/lane_edge", self._on_lane_edges, 10)
         node.create_subscription(
             String, "/perception/dashed_line", self._on_dashed_line, 10)
+        node.create_subscription(
+            String, "/perception/slope", self._on_slope, 10)
 
     def _on_corridor(self, msg):
         with self._lock:
@@ -134,6 +153,11 @@ class PerceptionHub:
             self._lane_edges = LaneEdges(
                 left_offset_px=float(data.get("left_offset_px", 0.0)),
                 right_offset_px=float(data.get("right_offset_px", 0.0)),
+                center_offset_px=float(data.get("center_offset_px", 0.0)),
+                left_confidence=float(data.get("left_confidence", 0.0)),
+                right_confidence=float(data.get("right_confidence", 0.0)),
+                horizontal_confidence=float(data.get("horizontal_confidence", 0.0)),
+                turn_hint=str(data.get("turn_hint", "")),
                 confidence=float(data.get("confidence", 0.0)),
             )
 
@@ -145,6 +169,18 @@ class PerceptionHub:
             else:
                 self._dashed_line = DashedLineDet(
                     center_px=_center(data), confidence=float(data.get("confidence", 0.0)))
+
+    def _on_slope(self, msg):
+        data = _load_dict(msg.data)
+        with self._lock:
+            self._slope = SlopeState(
+                detected=bool(data.get("detected", False)),
+                angle_deg=float(data.get("angle_deg", 0.0) or 0.0),
+                distance_m=float(data.get("distance_m", NO_RETURN) or NO_RETURN),
+                midpoint_m=float(data.get("midpoint_m", NO_RETURN) or NO_RETURN),
+                length_m=float(data.get("length_m", 0.0) or 0.0),
+                status=str(data.get("status", "")),
+            )
 
     def latest_lidar_corridor(self) -> CorridorState:
         """返回最近一帧走廊状态。无数据时返回默认（全 NO_RETURN）。"""
@@ -182,6 +218,10 @@ class PerceptionHub:
     def latest_dashed_line(self) -> Optional[DashedLineDet]:
         with self._lock:
             return self._dashed_line
+
+    def latest_slope(self) -> SlopeState:
+        with self._lock:
+            return self._slope
 
 
 def _load_list(raw: str) -> list[dict]:

@@ -6,14 +6,15 @@ import time
 from enum import Enum, auto
 from pathlib import Path
 
-from core.gaits.low_walk import execute_low_walk
-from core.stage_base import Stage, StageStatus
+from core.customized_gait.low_walk import execute_low_walk
+from core.framework.stage import Stage, StageStatus
 from config.loader import load_stage_params
 
 
 class Phase(Enum):
     ENTER = auto()
     SCAN_LANE = auto()
+    APPROACH_ITEM = auto()
     INTERACT = auto()
     SHIFT_LANE = auto()
     GO_BRIDGE = auto()
@@ -43,6 +44,7 @@ class Stage4TunnelSearch(Stage):
         self.phase_start = 0.0
         self.lane_index = 0
         self.current_kind = None
+        self.current_det = None
         self.announced: set[str] = set()
         self.handled_targets: set[str] = set()
         self.handled_obstacles: set[str] = set()
@@ -90,6 +92,23 @@ class Stage4TunnelSearch(Stage):
             return "football", football
         return None, None
 
+    def _target_distance(self) -> float:
+        if self.current_det is None:
+            return 0.0
+        return float(getattr(self.current_det, "distance_m", 0.0))
+
+    def _target_bearing(self) -> float:
+        if self.current_det is None:
+            return 0.0
+        return float(getattr(self.current_det, "bearing_rad", 0.0))
+
+    def _ready_to_interact(self) -> bool:
+        if self.current_kind == "red_pole":
+            return self._target_distance() <= self.p["red_pole_distance"]
+        if self.current_kind == "block_obstacle":
+            return self._target_distance() <= self.p["obstacle_distance"]
+        return self._target_distance() <= self.p["target_interact_distance"]
+
     def _handle_current(self, elapsed: float) -> None:
         kind = self.current_kind
         if kind == "red_pole":
@@ -99,20 +118,20 @@ class Stage4TunnelSearch(Stage):
             return
 
         if kind == "block_obstacle":
-            self.ctx.dog.set_velocity(self.p["detour_speed"], self.p["lane_shift_speed"], 0.0)
+            self.ctx.dog.set_velocity_command(self.p["detour_speed"], self.p["lane_shift_speed"], 0.0)
             if elapsed >= self.p["detour_time"]:
                 self.handled_obstacles.add(kind)
                 self._switch(Phase.SCAN_LANE)
             return
 
         if kind == "football":
-            self.ctx.dog.set_velocity(self.p["kick_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["kick_speed"], 0.0, 0.0)
             if elapsed >= self.p["kick_time"]:
                 self.handled_targets.add(kind)
                 self._switch(Phase.SCAN_LANE)
             return
 
-        self.ctx.dog.set_velocity(self.p["bump_speed"], 0.0, 0.0)
+        self.ctx.dog.set_velocity_command(self.p["bump_speed"], 0.0, 0.0)
         if elapsed >= self.p["bump_time"]:
             self.handled_targets.add(kind)
             self._switch(Phase.SCAN_LANE)
@@ -129,16 +148,28 @@ class Stage4TunnelSearch(Stage):
                 self._switch(Phase.GO_BRIDGE)
                 return StageStatus.RUNNING
 
-            kind, _ = self._select_candidate()
+            kind, det = self._select_candidate()
             if kind is not None:
                 self.current_kind = kind
+                self.current_det = det
                 self._announce(kind)
-                self._switch(Phase.INTERACT)
+                if self._ready_to_interact():
+                    self._switch(Phase.INTERACT)
+                else:
+                    self._switch(Phase.APPROACH_ITEM)
                 return StageStatus.RUNNING
 
-            self.ctx.dog.set_velocity(self.p["approach_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["approach_speed"], 0.0, 0.0)
             if elapsed >= self.p["lane_scan_time"]:
                 self._switch(Phase.SHIFT_LANE)
+            return StageStatus.RUNNING
+
+        if self.phase == Phase.APPROACH_ITEM:
+            if self._ready_to_interact() or elapsed >= self.p["approach_item_timeout"]:
+                self._switch(Phase.INTERACT)
+                return StageStatus.RUNNING
+            wz = self._target_bearing() * self.p["approach_turn_gain"]
+            self.ctx.dog.set_velocity_command(self.p["approach_speed"], 0.0, wz)
             return StageStatus.RUNNING
 
         if self.phase == Phase.INTERACT:
@@ -146,20 +177,20 @@ class Stage4TunnelSearch(Stage):
             return StageStatus.RUNNING
 
         if self.phase == Phase.SHIFT_LANE:
-            self.ctx.dog.set_velocity(0.0, self.p["lane_shift_speed"], 0.0)
+            self.ctx.dog.set_velocity_command(0.0, self.p["lane_shift_speed"], 0.0)
             if elapsed >= self.p["lane_shift_time"]:
                 self.lane_index = min(self.lane_index + 1, self.p["lane_count"] - 1)
                 self._switch(Phase.SCAN_LANE)
             return StageStatus.RUNNING
 
         if self.phase == Phase.GO_BRIDGE:
-            self.ctx.dog.set_velocity(self.p["bridge_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["bridge_speed"], 0.0, 0.0)
             if elapsed >= self.p["bridge_time"]:
                 self._switch(Phase.DONE)
             return StageStatus.RUNNING
 
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
         return StageStatus.SUCCEEDED
 
     def on_exit(self) -> None:
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)

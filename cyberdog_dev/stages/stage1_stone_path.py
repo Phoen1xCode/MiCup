@@ -8,7 +8,11 @@ import time
 from enum import Enum, auto
 from pathlib import Path
 
-from core.stage_base import Stage, StageStatus
+from core.lane_follow import (
+    VisualLaneFollowParams,
+    compute_visual_lane_follow_correction,
+)
+from core.framework.stage import Stage, StageStatus
 
 
 class Phase(Enum):
@@ -31,6 +35,7 @@ class Stage1StonePath(Stage):
         self.turn_direction = 0.0
         self.estimated_turn_angle = 0.0
         self.last_tick_time = 0.0
+        self.recovery_stand_requested = False
         config_dir = Path(__file__).resolve().parent.parent / "config"
         from config.loader import load_stage_params
         self.p = load_stage_params(config_dir / "stage_params.toml", stage_id=1)
@@ -39,6 +44,7 @@ class Stage1StonePath(Stage):
         self.start_time = time.monotonic()
         self.phase_start = self.start_time
         self.last_tick_time = self.start_time
+        self.recovery_stand_requested = False
         self.ctx.pose.set_origin_here()
         self.ctx.logger.info(f"[{self.name}] 进入，phase=RECOVERY_STAND")
 
@@ -50,63 +56,78 @@ class Stage1StonePath(Stage):
         self.phase_start = time.monotonic()
         self.ctx.logger.info(f"[{self.name}] -> {phase.name}")
 
+    def _visual_lane_command(self, lane_edges):
+        params = VisualLaneFollowParams(
+            forward_speed=float(self.p["forward_speed"]),
+            lateral_gain=float(self.p["visual_lateral_gain"]),
+            max_lateral=float(self.p["visual_max_lateral"]),
+            min_confidence=float(self.p["visual_lane_confidence"]),
+        )
+        return compute_visual_lane_follow_correction(lane_edges, params)
+
+    def _visual_turn_direction(self, lane_edges) -> float:
+        if lane_edges.turn_hint == "left":
+            return 1.0
+        if lane_edges.turn_hint == "right":
+            return -1.0
+        return 1.0
+
     def tick(self) -> StageStatus:
         now = time.monotonic()
         dt = max(0.0, now - self.last_tick_time)
         self.last_tick_time = now
         elapsed = now - self.phase_start
 
-        corridor = self.ctx.perception.latest_lidar_corridor()
-        front, left, right = corridor.front, corridor.left, corridor.right
+        lane_edges = self.ctx.perception.latest_lane_edges()
 
         if self.phase == Phase.RECOVERY_STAND:
-            self.ctx.dog.stand(hold=0.0)
-            if elapsed >= self.p["stand_time"]:
+            if not self.recovery_stand_requested:
+                self.ctx.dog.execute_discrete_action(mode=12, gait_id=0, wait_for_completion=True)
+                self.recovery_stand_requested = True
+            if time.monotonic() - self.phase_start >= self.p["stand_time"]:
                 self._switch(Phase.STABILIZE)
             return StageStatus.RUNNING
 
         if self.phase == Phase.STABILIZE:
-            self.ctx.dog.stop()
+            self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
             if elapsed >= self.p["stabilize_time"]:
                 self._switch(Phase.STRAIGHT_TO_BEND)
             return StageStatus.RUNNING
 
         if self.phase == Phase.STRAIGHT_TO_BEND:
-            self.ctx.dog.set_velocity(self.p["forward_speed"], 0.0, 0.0)
-            bend_by_lidar = (
+            vx, vy, wz = self._visual_lane_command(lane_edges)
+            self.ctx.dog.set_velocity_command(vx, vy, wz)
+            bend_by_visual = (
                 elapsed >= self.p["min_straight_time"]
-                and front <= self.p["bend_front_threshold"]
-                and max(left, right) >= self.p["open_side_threshold"]
+                and lane_edges.horizontal_confidence >= self.p["visual_horizontal_confidence"]
             )
             bend_by_timeout = elapsed >= self.p["max_straight_time"]
-            if bend_by_lidar or bend_by_timeout:
-                self.turn_direction = 1.0 if left >= right else -1.0
+            if bend_by_visual or bend_by_timeout:
+                self.turn_direction = self._visual_turn_direction(lane_edges)
                 self.estimated_turn_angle = 0.0
                 self._switch(Phase.TURNING)
             return StageStatus.RUNNING
 
         if self.phase == Phase.TURNING:
-            self.ctx.dog.set_velocity(
+            self.ctx.dog.set_velocity_command(
                 self.p["turn_forward_speed"], 0.0,
                 self.turn_direction * self.p["turn_yaw_speed"])
             self.estimated_turn_angle += abs(self.p["turn_yaw_speed"]) * dt
-            front_clear = front >= self.p["exit_front_clear"]
             turned_enough = self.estimated_turn_angle >= self.p["turn_angle"]
             timed_out = elapsed >= self.p["max_turn_time"]
-            if elapsed >= self.p["min_turn_time"] and (
-                    (front_clear and turned_enough) or timed_out):
+            if elapsed >= self.p["min_turn_time"] and (turned_enough or timed_out):
                 self._switch(Phase.STRAIGHT_TO_EXIT)
             return StageStatus.RUNNING
 
         if self.phase == Phase.STRAIGHT_TO_EXIT:
-            self.ctx.dog.set_velocity(self.p["exit_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["exit_speed"], 0.0, 0.0)
             if elapsed >= self.p["finish_straight_time"]:
                 self._switch(Phase.DONE)
             return StageStatus.RUNNING
 
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
         return StageStatus.SUCCEEDED
 
     def on_exit(self) -> None:
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
         self.ctx.logger.info(f"[{self.name}] 退出")

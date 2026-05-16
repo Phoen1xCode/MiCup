@@ -1,12 +1,11 @@
-from core.stage_base import StageStatus
+from core.framework.stage import StageStatus
 from perception.hub import DashedLineDet, LaneEdges
 from stages.stage5_bridge import Phase, Stage5Bridge
 
 
 class FakeDog:
     def __init__(self): self.calls = []
-    def set_velocity(self, vx, vy, wz): self.calls.append(("vel", vx, vy, wz))
-    def stop(self): self.calls.append(("stop",))
+    def set_velocity_command(self, vx, vy, wz, **kw): self.calls.append(("vel", vx, vy, wz))
 
 
 class FakePose:
@@ -55,7 +54,16 @@ def test_stage5_dashed_line_enters_jump_after_min_walk():
     stage.phase = Phase.WALK_BRIDGE
     stage.phase_start -= stage.p["min_walk_time"] + 0.1
     stage.tick()
+    assert stage.phase is Phase.CLEAR_DASHED_LINE
+
+
+def test_stage5_clears_dashed_line_before_jump():
+    stage, ctx = make_stage()
+    stage.phase = Phase.CLEAR_DASHED_LINE
+    stage.phase_start -= stage.p["clear_dashed_time"] + 0.1
+    stage.tick()
     assert stage.phase is Phase.JUMP_DOWN
+    assert ctx.dog.calls[-1][0] == "vel"
 
 
 def test_stage5_timeout_enters_jump_without_dashed_line():

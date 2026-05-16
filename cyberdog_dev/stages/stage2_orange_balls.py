@@ -4,7 +4,7 @@ import time
 from enum import Enum, auto
 from pathlib import Path
 
-from core.stage_base import Stage, StageStatus
+from core.framework.stage import Stage, StageStatus
 from config.loader import load_stage_params
 
 
@@ -29,6 +29,8 @@ class Stage2OrangeBalls(Stage):
         self.phase = Phase.ENTER
         self.phase_start = 0.0
         self.hit_count = 0
+        self.hit_bearings = []
+        self.current_target = None
 
     def on_enter(self) -> None:
         self.start_time = time.monotonic()
@@ -48,7 +50,15 @@ class Stage2OrangeBalls(Stage):
         balls = self.ctx.perception.latest_orange_balls()
         if not balls:
             return None
-        return min(balls, key=lambda b: b.distance_m)
+        unseen = [
+            b for b in balls
+            if all(
+                abs(b.bearing_rad - seen) > self.p["hit_bearing_tolerance"]
+                for seen in self.hit_bearings
+            )
+        ]
+        candidates = unseen or balls
+        return min(candidates, key=lambda b: b.distance_m)
 
     def tick(self) -> StageStatus:
         elapsed = time.monotonic() - self.phase_start
@@ -58,7 +68,7 @@ class Stage2OrangeBalls(Stage):
             return StageStatus.RUNNING
 
         if self.phase == Phase.SWEEP_SCAN:
-            self.ctx.dog.set_velocity(0.0, 0.0, self.p["search_turn_speed"])
+            self.ctx.dog.set_velocity_command(0.0, 0.0, self.p["search_turn_speed"])
             if self._select_target() is not None or elapsed >= 2.0:
                 self._switch(Phase.APPROACH_NEXT)
             return StageStatus.RUNNING
@@ -66,24 +76,28 @@ class Stage2OrangeBalls(Stage):
         if self.phase == Phase.APPROACH_NEXT:
             target = self._select_target()
             if target is None:
-                self.ctx.dog.set_velocity(0.0, 0.0, self.p["search_turn_speed"])
+                self.ctx.dog.set_velocity_command(0.0, 0.0, self.p["search_turn_speed"])
                 return StageStatus.RUNNING
             if target.distance_m <= self.p["hit_distance"]:
+                self.current_target = target
                 self._switch(Phase.BUMP)
                 return StageStatus.RUNNING
             wz = target.bearing_rad * self.p["approach_turn_gain"]
-            self.ctx.dog.set_velocity(self.p["approach_speed"], 0.0, wz)
+            self.ctx.dog.set_velocity_command(self.p["approach_speed"], 0.0, wz)
             return StageStatus.RUNNING
 
         if self.phase == Phase.BUMP:
-            self.ctx.dog.set_velocity(self.p["bump_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["bump_speed"], 0.0, 0.0)
             if elapsed >= self.p["bump_time"]:
                 self.hit_count += 1
+                if self.current_target is not None:
+                    self.hit_bearings.append(self.current_target.bearing_rad)
+                    self.current_target = None
                 self._switch(Phase.BACKOFF)
             return StageStatus.RUNNING
 
         if self.phase == Phase.BACKOFF:
-            self.ctx.dog.set_velocity(self.p["backoff_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["backoff_speed"], 0.0, 0.0)
             if elapsed >= self.p["backoff_time"]:
                 if self.hit_count >= self.p["target_count"]:
                     self._switch(Phase.GO_EXIT)
@@ -92,13 +106,13 @@ class Stage2OrangeBalls(Stage):
             return StageStatus.RUNNING
 
         if self.phase == Phase.GO_EXIT:
-            self.ctx.dog.set_velocity(self.p["exit_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["exit_speed"], 0.0, 0.0)
             if elapsed >= self.p["exit_time"]:
                 self._switch(Phase.DONE)
             return StageStatus.RUNNING
 
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
         return StageStatus.SUCCEEDED
 
     def on_exit(self) -> None:
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)

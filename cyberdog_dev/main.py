@@ -53,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_stage(stage, ctx) -> "StageResult":
     """以 ~20Hz tick 一个赛段直到结束或超时。"""
-    from core.stage_base import StageResult, StageStatus
+    from core.framework.stage import StageResult, StageStatus
 
     stage.on_enter()
     start = time.monotonic()
@@ -81,7 +81,7 @@ def run_stage(stage, ctx) -> "StageResult":
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
 
-    from core.stage_context import RunMode, build_context
+    from core.framework.context import RunMode, build_context
     from stages.stage1_stone_path import Stage1StonePath
     from stages.stage2_orange_balls import Stage2OrangeBalls
     from stages.stage3_curve_dash import Stage3CurveDash
@@ -110,7 +110,7 @@ def main(argv=None) -> int:
             results.append(run_stage(stage_cls(ctx), ctx))
     except KeyboardInterrupt:
         ctx.logger.warn("收到中断，停止机器狗")
-        ctx.dog.stop()
+        ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
 
     print("\n运行总结")
     for r in results:

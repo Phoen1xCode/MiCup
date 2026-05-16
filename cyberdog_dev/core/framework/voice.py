@@ -10,7 +10,8 @@ class VoiceController:
 
     def say(self, text: str) -> None:
         self.history.append(text)
+
         if self.logger is not None:
-            self.logger.info(f"语音播报: {text}")
+            self.logger.info(f"[INFO] 语音播报: {text}")
         else:
-            print(f"语音播报: {text}")
+            print(f"[INFO] 语音播报: {text}")

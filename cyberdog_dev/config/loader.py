@@ -1,4 +1,4 @@
-"""toml 配置加载辅助。"""
+"""toml 配置加载辅助"""
 
 import importlib
 import sys
@@ -7,7 +7,7 @@ from typing import Dict
 
 
 def _load_toml(path: Path):
-    """加载 TOML，避开仓库内旧 `toml/` 空目录对第三方包的遮蔽。"""
+    """加载 TOML"""
     try:
         import tomllib
         return tomllib.loads(path.read_text())
@@ -51,3 +51,12 @@ def load_stage_params(path: Path, stage_id: int) -> Dict[str, float]:
     if key not in data:
         raise KeyError(f"stage_params.toml 中没有 {key}，可选: {list(data)}")
     return data[key]
+
+
+def load_params_section(path: Path, section: str) -> Dict[str, float]:
+    """读取 stage_params.toml，返回指定段落的参数字典。"""
+    data = _load_toml(path)
+    if section not in data:
+        raise KeyError(f"stage_params.toml 中没有 {section}，可选: {list(data)}")
+    return data[section]
+

@@ -4,7 +4,7 @@ import time
 from enum import Enum, auto
 from pathlib import Path
 
-from core.stage_base import Stage, StageStatus
+from core.framework.stage import Stage, StageStatus
 from config.loader import load_stage_params
 
 
@@ -53,43 +53,51 @@ class Stage6Kick(Stage):
         if self.phase == Phase.FIND_BALL:
             ball = self.ctx.perception.latest_football()
             if ball is None:
-                self.ctx.dog.set_velocity(0.0, 0.0, self.p["search_turn_speed"])
+                self.ctx.dog.set_velocity_command(0.0, 0.0, self.p["search_turn_speed"])
                 if elapsed >= 1.0:
                     self._switch(Phase.KICK)
                 return StageStatus.RUNNING
-            self.ctx.dog.set_velocity(0.0, 0.0, ball.bearing_rad * self.p["align_turn_gain"])
+            self.ctx.dog.set_velocity_command(0.0, 0.0, ball.bearing_rad * self.p["align_turn_gain"])
             self._switch(Phase.ALIGN_BEHIND_BALL)
             return StageStatus.RUNNING
 
         if self.phase == Phase.ALIGN_BEHIND_BALL:
             ball = self.ctx.perception.latest_football()
-            if ball is None or abs(ball.bearing_rad) < 0.08:
+            if ball is None:
+                self._switch(Phase.KICK)
+            elif (
+                abs(ball.bearing_rad) < self.p["kick_bearing_tolerance"]
+                and ball.distance_m <= self.p["kick_distance"]
+            ):
                 self._switch(Phase.KICK)
             else:
-                self.ctx.dog.set_velocity(self.p["approach_speed"], 0.0,
-                                          ball.bearing_rad * self.p["align_turn_gain"])
+                wz = 0.0
+                if abs(ball.bearing_rad) >= self.p["kick_bearing_tolerance"]:
+                    wz = ball.bearing_rad * self.p["align_turn_gain"]
+                self.ctx.dog.set_velocity_command(self.p["approach_speed"], 0.0,
+                                          wz)
             return StageStatus.RUNNING
 
         if self.phase == Phase.KICK:
-            self.ctx.dog.set_velocity(self.p["kick_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["kick_speed"], 0.0, 0.0)
             if elapsed >= self.p["kick_time"]:
                 self._switch(Phase.APPROACH_FINISH_CIRCLE)
             return StageStatus.RUNNING
 
         if self.phase == Phase.APPROACH_FINISH_CIRCLE:
-            self.ctx.dog.set_velocity(self.p["finish_speed"], 0.0, 0.0)
+            self.ctx.dog.set_velocity_command(self.p["finish_speed"], 0.0, 0.0)
             if elapsed >= self.p["finish_time"]:
                 self._switch(Phase.LIE_DOWN_IN_CIRCLE)
             return StageStatus.RUNNING
 
         if self.phase == Phase.LIE_DOWN_IN_CIRCLE:
-            self.ctx.dog.lie_down(hold=0.0)
+            self.ctx.dog.execute_discrete_action(mode=7, gait_id=0, wait_for_completion=True)
             if elapsed >= self.p["lie_down_time"]:
                 self._switch(Phase.DONE)
             return StageStatus.RUNNING
 
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)
         return StageStatus.SUCCEEDED
 
     def on_exit(self) -> None:
-        self.ctx.dog.stop()
+        self.ctx.dog.set_velocity_command(0.0, 0.0, 0.0)

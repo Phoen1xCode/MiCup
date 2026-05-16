@@ -2,7 +2,7 @@
 
 set -e
 
-LOCAL_CODE=~/Project/MiCup
+LOCAL_CODE=~/MiCup
 CONTAINER_NAME=cyberdog_dev
 IMAGE=cyberdog_sim:v2026
 
@@ -18,7 +18,7 @@ if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     fi
 else
     echo "==> 首次创建开发容器 ${CONTAINER_NAME}"
-    sudo docker run -it \
+    docker run -it \
         --shm-size="1g" \
         --privileged=true \
         -e DISPLAY=$DISPLAY \

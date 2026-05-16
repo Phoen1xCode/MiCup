@@ -1,5 +1,5 @@
 import pytest
-from core.stage_base import Stage, StageStatus, StageResult
+from core.framework.stage import Stage, StageStatus, StageResult
 
 
 def test_stage_status_has_four_states():
