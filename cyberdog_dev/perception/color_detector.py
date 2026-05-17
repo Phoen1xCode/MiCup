@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from config.loader import load_topics
+
 from perception.vision_utils import (
     HsvRange,
     detect_colored_objects_hsv,
@@ -26,13 +27,20 @@ def _load_hsv_config(path: Path, mode: str, key: str) -> list[HsvRange]:
     ]
 
 
-def run_object_detector(node_name: str, publish_topic: str, hsv_key: str, label: str,
-                        real_width_m: float = 0.2, min_area_px: float = 80.0, args=None):
+def run_object_detector(
+    node_name: str,
+    publish_topic: str,
+    hsv_key: str,
+    label: str,
+    real_width_m: float = 0.2,
+    min_area_px: float = 80.0,
+    args=None,
+):
     import rclpy
-    from sensor_msgs.msg import Image
-    from std_msgs.msg import String
     from rclpy.node import Node
     from rclpy.qos import QoSProfile, QoSReliabilityPolicy
+    from sensor_msgs.msg import Image
+    from std_msgs.msg import String
 
     parser = argparse.ArgumentParser(description=f"{node_name} detector")
     parser.add_argument("--mode", default="sim", choices=["sim", "real"])
@@ -48,19 +56,32 @@ def run_object_detector(node_name: str, publish_topic: str, hsv_key: str, label:
             qos = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
             self.pub = self.create_publisher(String, publish_topic, 10)
             self.create_subscription(Image, topics["camera_topic"], self._on_image, qos)
-            self.get_logger().info(f"{node_name} 已启动，订阅: {topics['camera_topic']}")
+            self.get_logger().info(
+                f"{node_name} 已启动，订阅: {topics['camera_topic']}"
+            )
 
         def _on_image(self, msg):
             detections = []
             try:
                 import cv2
                 import numpy as np
-                image = np.frombuffer(msg.data, dtype=np.uint8).reshape((msg.height, msg.width, -1))
+
+                image = np.frombuffer(msg.data, dtype=np.uint8).reshape(
+                    (msg.height, msg.width, -1)
+                )
                 hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
                 detections = detect_colored_objects_hsv(
-                    hsv, hsv_ranges, label=label, min_area_px=min_area_px, real_width_m=real_width_m)
+                    hsv,
+                    hsv_ranges,
+                    label=label,
+                    min_area_px=min_area_px,
+                    real_width_m=real_width_m,
+                )
             except Exception as exc:
-                self.get_logger().warn(f"{node_name} image handling failed: {exc}", throttle_duration_sec=2.0)
+                self.get_logger().warn(
+                    f"{node_name} image handling failed: {exc}",
+                    throttle_duration_sec=2.0,
+                )
             out = String()
             out.data = json.dumps(detections, ensure_ascii=False)
             self.pub.publish(out)
@@ -78,10 +99,10 @@ def run_object_detector(node_name: str, publish_topic: str, hsv_key: str, label:
 
 def run_scalar_detector(node_name: str, publish_topic: str, args=None):
     import rclpy
-    from sensor_msgs.msg import Image
-    from std_msgs.msg import String
     from rclpy.node import Node
     from rclpy.qos import QoSProfile, QoSReliabilityPolicy
+    from sensor_msgs.msg import Image
+    from std_msgs.msg import String
 
     parser = argparse.ArgumentParser(description=f"{node_name} detector")
     parser.add_argument("--mode", default="sim", choices=["sim", "real"])
@@ -98,7 +119,9 @@ def run_scalar_detector(node_name: str, publish_topic: str, args=None):
             qos = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
             self.pub = self.create_publisher(String, publish_topic, 10)
             self.create_subscription(Image, topics["camera_topic"], self._on_image, qos)
-            self.get_logger().info(f"{node_name} 已启动，订阅: {topics['camera_topic']}")
+            self.get_logger().info(
+                f"{node_name} 已启动，订阅: {topics['camera_topic']}"
+            )
 
         def _on_image(self, msg):
             out = String()
@@ -106,14 +129,20 @@ def run_scalar_detector(node_name: str, publish_topic: str, args=None):
             try:
                 import cv2
                 import numpy as np
-                image = np.frombuffer(msg.data, dtype=np.uint8).reshape((msg.height, msg.width, -1))
+
+                image = np.frombuffer(msg.data, dtype=np.uint8).reshape(
+                    (msg.height, msg.width, -1)
+                )
                 hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
                 if "lane_edge" in node_name:
                     result = detect_lane_edges_hsv(hsv, hsv_ranges)
                 else:
                     result = detect_dashed_line_hsv(hsv, hsv_ranges) or {}
             except Exception as exc:
-                self.get_logger().warn(f"{node_name} image handling failed: {exc}", throttle_duration_sec=2.0)
+                self.get_logger().warn(
+                    f"{node_name} image handling failed: {exc}",
+                    throttle_duration_sec=2.0,
+                )
             out.data = json.dumps(result, ensure_ascii=False)
             self.pub.publish(out)
 

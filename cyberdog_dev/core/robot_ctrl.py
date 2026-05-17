@@ -44,7 +44,7 @@ class RobotCtrl:
         lcm_odom_url="udpm://239.255.76.67:7667?ttl=255",  # 里程计通道，接收全局定位数据
         lcm_odom_channel="global_to_robot",  # 里程计通道名
         cmd_heartbeat_hz=20.0,  # 心跳频率，默认 20 Hz
-        enable_odom_lcm=True,  # 是否启用里程计，默认开启
+        enable_odom_lcm=False,  # 是否启用里程计，默认开启
         user_gait_file_channel="user_gait_file",  # 步态文件通道
         user_gait_result_channel="user_gait_result",  # 步态结果通道
     ):

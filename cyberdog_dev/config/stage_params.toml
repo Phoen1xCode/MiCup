@@ -2,29 +2,18 @@
 # 所有数值为 Gazebo 保守初值，进仿真后逐段调参。
 
 [stage1]
-stand_time = 4.5
-stabilize_time = 1.2
-forward_speed = 0.28
-exit_speed = 0.3
-turn_forward_speed = 0.16
-turn_yaw_speed = 0.52
-turn_angle = 1.57
-bend_front_threshold = 1.05
-open_side_threshold = 1.15
-exit_front_clear = 1.65
-min_straight_time = 6.0
-max_straight_time = 16.0
-min_turn_time = 2.0
-max_turn_time = 5.5
-finish_straight_time = 4.5
-max_time = 45.0
-lateral_gain = 0.12
-max_lateral = 0.08
-front_stop_distance = 0.45
-visual_lane_confidence = 0.4
-visual_horizontal_confidence = 0.5
-visual_lateral_gain = 0.002
-visual_max_lateral = 0.08
+# 石径探路：开环行走 + TickMotion
+# 石板宽 30cm，高 5cm，间隔 20cm
+stand_time = 3          # 站立后等待稳定
+stabilize_time = 1.2      # 原地稳定
+forward_speed = 0.5      # 直走速度 (m/s)，石板路保守
+straight_distance = 1.5   # 起点到弯道距离 (m)
+turn_direction = 1.0      # 转弯方向：1.0=左转，-1.0=右转
+turn_angle_deg = 90.0     # 转弯角度 (°)
+turn_speed_dps = 30.0     # 转弯角速度 (°/s)
+exit_speed = 0.15         # 出弯速度 (m/s)
+exit_distance = 1.5       # 出弯直走距离 (m)
+max_time = 45.0           # 赛段总超时 (s)
 
 [stage2]
 search_turn_speed = 0.35

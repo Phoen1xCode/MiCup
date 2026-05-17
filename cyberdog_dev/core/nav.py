@@ -1,15 +1,16 @@
 import math
 import time
 
-from core.lane_follow import LaneFollowParams, compute_lane_follow_correction
 from core.basic_action import (
     move_lateral_timed,
     move_straight_timed,
     turn_in_place_timed,
 )
+from core.lane_follow import LaneFollowParams, compute_lane_follow_correction
 
 
-def _normalize_angle_for_basic_action(angle_rad):
+def _normalize_angle(angle_rad):
+    """角度归一化辅助函数，将任意弧度值约束到 (-π, π] 范围内"""
     while angle_rad > math.pi:
         angle_rad -= 2 * math.pi
     while angle_rad < -math.pi:
@@ -20,53 +21,54 @@ def _normalize_angle_for_basic_action(angle_rad):
 def align_yaw_to_target(
     logger,
     robot_ctrl,
-    pose_monitor,
-    target_yaw_degrees,
-    tolerance_degrees=2.0,
-    max_attempts=10,
-    min_angular_speed_dps=3.0,  # 最小转动速度
-    max_angular_speed_dps=15.0,  # 最大转动速度
+    pose_monitor,  # 位姿监视器
+    target_yaw_degrees,  # 目标偏向角
+    tolerance_degrees=2.0,  # 允许的角度误差
+    max_attempts=10,  # 最大尝试次数
+    min_angular_speed_dps=3.0,  # 最小角速度
+    max_angular_speed_dps=15.0,  # 最大角速度
     angular_speed_scale_factor=1.0,  # 角速度缩放因子
-    max_rotation_per_step_degrees=15.0,
+    max_rotation_per_step_degrees=15.0,  # 单步最大旋转角度，防止一步转过头
 ):
     """
+    闭环控制机器人原地旋转到目标偏航角
     【闭环-动态速度】精确调整机器人偏航角至目标角度。
     根据偏差距离动态计算转动速度。
     """
-    target_yaw_rad = math.radians(target_yaw_degrees)
+    target_yaw_rad = math.radians(target_yaw_degrees)  # 目标角度转为弧度
 
     logger.info(
         f"校准偏航角 -> 目标: {target_yaw_degrees:.2f}° (容差: ±{tolerance_degrees:.2f}°)"
     )
     logger.info(
-        f"  最小转动速度: {min_angular_speed_dps}°/s, 最大转动速度: {max_angular_speed_dps}°/s"
+        f"最小转动速度: {min_angular_speed_dps}°/s, 最大转动速度: {max_angular_speed_dps}°/s"
     )
 
     for attempt_count in range(max_attempts):
-        # 获取当前偏航角
-        current_yaw_rad = pose_monitor.get_yaw_from_tf_rad()  # tf 获取
-        total_yaw_error_rad = _normalize_angle_for_basic_action(
-            target_yaw_rad - current_yaw_rad
-        )
-        total_yaw_error_deg_abs = abs(
-            math.degrees(total_yaw_error_rad)
-        )  # 用于日志和速度选择
+        # 通过 TF（坐标变换）获取机器人当前朝向，单位弧度
+        current_yaw_rad = pose_monitor.get_yaw_from_tf_rad()
+        # 计算目标与当前的角度差，并归一化到 (-π, π]
+        total_yaw_error_rad = _normalize_angle(target_yaw_rad - current_yaw_rad)
+        # 误差取绝对值，转为度数，用于日志和速度计算
+        total_yaw_error_deg_abs = abs(math.degrees(total_yaw_error_rad))
 
         logger.info(
-            f"  尝试 {attempt_count + 1}/{max_attempts}: "
+            f"尝试 {attempt_count + 1}/{max_attempts}: "
             f"目标Yaw: {target_yaw_degrees:.2f}°, "
             f"当前Yaw: {math.degrees(current_yaw_rad):.2f}°, "
             f"误差: {math.degrees(total_yaw_error_rad):.2f}°"
         )
 
         if total_yaw_error_deg_abs <= tolerance_degrees:  # 直接用度数比较容差
-            logger.info(f"  成功对准目标偏航角 {target_yaw_degrees:.2f}°。")
-            robot_ctrl.set_velocity_command(0.0, 0.0, 0.0)
+            logger.info(f"成功对准目标偏航角 {target_yaw_degrees:.2f}°。")
+            robot_ctrl.set_velocity_command(0.0, 0.0, 0.0)  # 停止运动
             return True
 
         # 根据偏差距离动态计算角速度
         # 角速度与偏差成正比，但限制在最小和最大值之间
         dynamic_angular_speed_dps = total_yaw_error_deg_abs * angular_speed_scale_factor
+
+        #
         dynamic_angular_speed_dps = max(
             min_angular_speed_dps, min(dynamic_angular_speed_dps, max_angular_speed_dps)
         )
@@ -79,7 +81,7 @@ def align_yaw_to_target(
             )
 
         logger.info(
-            f"    执行单步旋转: {rotation_this_step_degrees:.2f}° @ {dynamic_angular_speed_dps:.1f}°/s (动态速度)"
+            f"执行单步旋转: {rotation_this_step_degrees:.2f}° @ {dynamic_angular_speed_dps:.1f}°/s (动态速度)"
         )
         step_success = turn_in_place_timed(
             ctrl=robot_ctrl,
@@ -250,7 +252,7 @@ def align_axis_by_strafing(
             add_final_stabilization_delay=False,
         )
         if not step_success:
-            logger.warn(f"    单步侧向平移执行失败。")
+            logger.warn("单步侧向平移执行失败。")
         time.sleep(stabilization_time_s)
 
     logger.warn(
@@ -337,16 +339,12 @@ def navigate_to_exact_pose(
     logger.info(
         f"\n--- 导航阶段 2: 通过侧向平移校准 {secondary_axis_to_align_laterally}轴到 {target_coord_secondary:.3f}m ---"
     )
-    current_yaw_for_lateral_rad = (
-        pose_monitor.get_yaw_from_tf_rad() or pose_monitor.get_yaw_from_imu_rad()
-    )
     success_secondary_axis = align_axis_by_strafing(
         logger,
         robot_ctrl,
         pose_monitor,
         target_coord_value=target_coord_secondary,
         axis_to_adjust_laterally=secondary_axis_to_align_laterally,
-        robot_current_yaw_rad=current_yaw_for_lateral_rad,
         tolerance_m=xy_tolerance_m,
         max_attempts=max_attempts_per_main_stage,
         fast_lateral_speed_mps=fast_lateral_speed_mps,
@@ -372,11 +370,9 @@ def navigate_to_exact_pose(
         target_yaw_degrees=target_yaw_degrees,
         tolerance_degrees=yaw_tolerance_degrees,
         max_attempts=max_attempts_per_main_stage,
-        fast_angular_speed_dps=slow_angular_speed_dps,  # 最终微调使用慢速档的参数
-        slow_down_yaw_threshold_degrees=slow_down_yaw_threshold_degrees,  # 切换到更慢速的阈值更小
-        slow_angular_speed_dps=slow_angular_speed_dps,  # 最终微调使用更慢的角速度
+        min_angular_speed_dps=slow_angular_speed_dps,   # 最终微调全程使用慢速
+        max_angular_speed_dps=slow_angular_speed_dps,   # min=max 确保全程慢速
         max_rotation_per_step_degrees=max_rotation_per_step_degrees,
-        stabilization_time_s=stabilization_time_s,
     )
     if not success_final_yaw:
         logger.warn("精确导航警告：最终偏航角微调未达最佳精度。")
@@ -396,9 +392,7 @@ def navigate_to_exact_pose(
     final_y_error_check = abs(target_y - final_coords_check[1])
     final_yaw_error_deg_check = abs(
         math.degrees(
-            _normalize_angle_for_basic_action(
-                math.radians(target_yaw_degrees) - final_yaw_rad_check
-            )
+            _normalize_angle(math.radians(target_yaw_degrees) - final_yaw_rad_check)
         )
     )
 
@@ -418,15 +412,3 @@ def navigate_to_exact_pose(
             "=== 精确导航任务 (指定优先轴，阶段速度) 未能达到所有精度要求。 ==="
         )
         return False
-
-
-def lane_follow_pd(robot_ctrl, corridor, params: LaneFollowParams) -> tuple:
-    """走廊居中：读取 corridor 距离 -> 计算速度 -> 下发给机器人。"""
-    vx, vy, wz = compute_lane_follow_correction(
-        left=corridor.left,
-        right=corridor.right,
-        front=corridor.front,
-        params=params,
-    )
-    robot_ctrl.set_velocity_command(vx, vy, wz)
-    return (vx, vy, wz)

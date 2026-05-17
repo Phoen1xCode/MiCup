@@ -1,16 +1,15 @@
+import math
+import threading
 
 import rclpy
-from rclpy.node import Node
-from rclpy.duration import Duration
-from rclpy.time import Time
-
 import tf2_ros
+from rclpy.duration import Duration
+from rclpy.node import Node
+from rclpy.time import Time
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
-import math
-import threading
 
 def quaternion_to_euler_yaw(q_x, q_y, q_z, q_w):
     """
@@ -22,14 +21,18 @@ def quaternion_to_euler_yaw(q_x, q_y, q_z, q_w):
     yaw = math.atan2(siny_cosp, cosy_cosp)
     return yaw
 
+
 class RobotPoseMonitor(Node):
     """
     一个纯粹的TF位姿监听节点。
     它依赖外部节点来广播完整的TF树。
     """
-    def __init__(self, node_name='robot_pose_monitor'):
+
+    def __init__(self, node_name="robot_pose_monitor"):
         super().__init__(node_name)
-        self.get_logger().info(f"位姿监听节点 '{self.get_name()}' 已启动 (纯监听模式)。")
+        self.get_logger().info(
+            f"位姿监听节点 '{self.get_name()}' 已启动 (纯监听模式)。"
+        )
 
         # --- TF监听器初始化 ---
         self.tf_buffer = Buffer(cache_time=Duration(seconds=10.0))
@@ -50,12 +53,16 @@ class RobotPoseMonitor(Node):
         self._offset_set = False  # 标记是否已设置初始偏移值
 
         # 监听的目标坐标系
-        self.reference_frame = 'odom'
-        self.robot_base_frame = 'base_link_leg'
+        self.reference_frame = "odom"
+        self.robot_base_frame = "base_link_leg"
 
         # 创建一个定时器，定期查询TF变换
-        self.tf_lookup_timer = self.create_timer(0.05, self.lookup_tf_transform) # 20 Hz
-        self.get_logger().info(f"将监听并获取 '{self.robot_base_frame}' 相对于 '{self.reference_frame}' 的位姿。")
+        self.tf_lookup_timer = self.create_timer(
+            0.05, self.lookup_tf_transform
+        )  # 20 Hz
+        self.get_logger().info(
+            f"将监听并获取 '{self.robot_base_frame}' 相对于 '{self.reference_frame}' 的位姿。"
+        )
 
     def lookup_tf_transform(self):
         """定时器回调函数，查询最新的TF变换并更新内部状态。"""
@@ -65,8 +72,8 @@ class RobotPoseMonitor(Node):
             transform_stamped = self.tf_buffer.lookup_transform(
                 self.reference_frame,
                 self.robot_base_frame,
-                Time(), # 获取最新可用的变换
-                timeout=Duration(seconds=0.1)
+                Time(),  # 获取最新可用的变换
+                timeout=Duration(seconds=0.1),
             )
 
             # 线程安全地更新位姿数据
@@ -75,11 +82,13 @@ class RobotPoseMonitor(Node):
                 self._current_y_tf = transform_stamped.transform.translation.y
                 self._current_z_tf = transform_stamped.transform.translation.z
                 q = transform_stamped.transform.rotation
-                self._current_yaw_from_tf_rad = quaternion_to_euler_yaw(q.x, q.y, q.z, q.w)
+                self._current_yaw_from_tf_rad = quaternion_to_euler_yaw(
+                    q.x, q.y, q.z, q.w
+                )
 
                 # 每秒输出一次当前的位置信息
                 current_time = self.get_clock().now()
-                if not hasattr(self, '_last_log_time'):
+                if not hasattr(self, "_last_log_time"):
                     self._last_log_time = current_time
 
                 time_diff = (current_time - self._last_log_time).nanoseconds / 1e9
@@ -87,7 +96,9 @@ class RobotPoseMonitor(Node):
                     x = self._current_x_tf - self._initial_x_offset
                     y = self._current_y_tf - self._initial_y_offset
                     z = self._current_z_tf - self._initial_z_offset
-                    yaw_deg = math.degrees(self._current_yaw_from_tf_rad - self._initial_yaw_offset_rad)
+                    yaw_deg = math.degrees(
+                        self._current_yaw_from_tf_rad - self._initial_yaw_offset_rad
+                    )
 
                     self.get_logger().info(
                         f"当前位置: x={x:.3f}m, y={y:.3f}m, z={z:.3f}m, yaw={yaw_deg:.1f}°"
@@ -96,10 +107,7 @@ class RobotPoseMonitor(Node):
 
         except TransformException as ex:
             # 使用带节流的日志，避免在TF暂时不可用时刷屏
-            self.get_logger().warn(
-                f"TF查询失败: {ex}",
-                throttle_duration_sec=1.0
-            )
+            self.get_logger().warn(f"TF查询失败: {ex}", throttle_duration_sec=1.0)
 
     # --- 线程安全的Getter方法，供外部调用 ---
 
@@ -128,7 +136,12 @@ class RobotPoseMonitor(Node):
     def get_current_pose(self):
         """获取机器人的当前位姿 (x, y, z, yaw)，自动减去初始偏移值，如果不可用则返回 (None, None, None, None)。"""
         with self._data_lock:
-            if None not in [self._current_x_tf, self._current_y_tf, self._current_z_tf, self._current_yaw_from_tf_rad]:
+            if None not in [
+                self._current_x_tf,
+                self._current_y_tf,
+                self._current_z_tf,
+                self._current_yaw_from_tf_rad,
+            ]:
                 x = self._current_x_tf - self._initial_x_offset
                 y = self._current_y_tf - self._initial_y_offset
                 z = self._current_z_tf - self._initial_z_offset
@@ -144,10 +157,16 @@ class RobotPoseMonitor(Node):
         for attempt in range(10):
             self.lookup_tf_transform()
             with self._data_lock:
-                if None not in [self._current_x_tf, self._current_y_tf, self._current_z_tf, self._current_yaw_from_tf_rad]:
+                if None not in [
+                    self._current_x_tf,
+                    self._current_y_tf,
+                    self._current_z_tf,
+                    self._current_yaw_from_tf_rad,
+                ]:
                     break
             if attempt < 9:  # 不是最后一次尝试
                 import time
+
                 time.sleep(0.1)  # 等待100ms后重试
 
         with self._data_lock:
@@ -197,12 +216,12 @@ class RobotPoseMonitor(Node):
         """获取当前的初始偏移值。"""
         with self._data_lock:
             return {
-                'x': self._initial_x_offset,
-                'y': self._initial_y_offset,
-                'z': self._initial_z_offset,
-                'yaw_rad': self._initial_yaw_offset_rad,
-                'yaw_deg': math.degrees(self._initial_yaw_offset_rad),
-                'offset_set': self._offset_set
+                "x": self._initial_x_offset,
+                "y": self._initial_y_offset,
+                "z": self._initial_z_offset,
+                "yaw_rad": self._initial_yaw_offset_rad,
+                "yaw_deg": math.degrees(self._initial_yaw_offset_rad),
+                "offset_set": self._offset_set,
             }
 
     def is_offset_set(self):
@@ -235,6 +254,7 @@ class RobotPoseMonitor(Node):
             return y
         raise ValueError(f"axis must be 'X' or 'Y', got {axis!r}")
 
+
 def main(args=None):
     """一个简单的main函数，用于独立测试此节点的监听功能。"""
     rclpy.init(args=args)
@@ -245,9 +265,11 @@ def main(args=None):
         coords = pose_monitor_node.get_coordinates_from_tf()
         yaw_tf_deg = pose_monitor_node.get_yaw_from_tf_degrees()
         if coords[0] is not None and yaw_tf_deg is not None:
-             pose_monitor_node.get_logger().info(f"当前位姿: X={coords[0]:.3f}, Y={coords[1]:.3f}, Yaw={yaw_tf_deg:.2f}°")
+            pose_monitor_node.get_logger().info(
+                f"当前位姿: X={coords[0]:.3f}, Y={coords[1]:.3f}, Yaw={yaw_tf_deg:.2f}°"
+            )
         else:
-             pose_monitor_node.get_logger().info("正在等待有效的位姿数据...")
+            pose_monitor_node.get_logger().info("正在等待有效的位姿数据...")
 
     # 创建一个1秒周期的定时器来打印日志
     log_timer = pose_monitor_node.create_timer(1.0, log_pose_data)
@@ -265,5 +287,6 @@ def main(args=None):
         executor.shutdown()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

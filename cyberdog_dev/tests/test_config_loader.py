@@ -26,4 +26,5 @@ def test_load_stage_params_stage1():
     p = load_stage_params(CONFIG_DIR / "stage_params.toml", stage_id=1)
     assert p["forward_speed"] > 0.0
     assert p["max_time"] == 45.0
-    assert p["visual_lane_confidence"] > 0.0
+    assert p["straight_distance"] > 0.0
+    assert p["turn_angle_deg"] > 0.0

@@ -39,7 +39,7 @@ def build_context(mode: RunMode) -> StageContext:
         rclpy.init(args=None)
 
     logger = ConsoleLogger()
-    dog = RobotCtrl(logger=logger, enable_odom_lcm=True, cmd_heartbeat_hz=20.0)
+    dog = RobotCtrl(logger=logger, enable_odom_lcm=False, cmd_heartbeat_hz=20.0)
     dog.start()
 
     pose = RobotPoseMonitor()
